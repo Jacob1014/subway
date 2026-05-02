@@ -633,13 +633,15 @@ async function handleShare() {
   const url = location.href;
   const text = `오늘의 지하철 🎲 — ${chosenLine.name} ${chosenStation}`;
 
-  if (navigator.share) {
+  // 터치 기반(모바일)에서만 네이티브 공유 시트 사용. 데스크톱은 클립보드 복사 + 토스트.
+  const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+  if (isTouchDevice && navigator.share) {
     try {
       await navigator.share({ title: '오늘의 지하철', text, url });
       return;
     } catch (e) {
-      if (e.name === 'AbortError') return; // 사용자가 취소
-      // 다른 에러면 클립보드 폴백으로 진행
+      if (e.name === 'AbortError') return;
+      // 다른 에러는 클립보드 폴백
     }
   }
 
