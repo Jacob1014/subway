@@ -631,22 +631,22 @@ function tryDeepLink() {
 async function handleShare() {
   if (!chosenLine || !chosenStation) return;
   const url = location.href;
-  const text = `오늘의 지하철 🎲 — ${chosenLine.name} ${chosenStation}`;
 
-  // 터치 기반(모바일)에서만 네이티브 공유 시트 사용. 데스크톱은 클립보드 복사 + 토스트.
+  // 모바일(터치)은 네이티브 공유 시트 — 메신저 앱에서 텍스트 함께 보여줌
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
   if (isTouchDevice && navigator.share) {
     try {
+      const text = `오늘의 지하철 🎲 — ${chosenLine.name} ${chosenStation}`;
       await navigator.share({ title: '오늘의 지하철', text, url });
       return;
     } catch (e) {
       if (e.name === 'AbortError') return;
-      // 다른 에러는 클립보드 폴백
     }
   }
 
+  // 데스크톱: URL만 복사 (주소창에 그대로 붙여넣기 가능)
   try {
-    await navigator.clipboard.writeText(`${text}\n${url}`);
+    await navigator.clipboard.writeText(url);
     showToast('링크 복사됨');
   } catch {
     showToast('복사 실패. 주소창을 직접 복사해주세요.');
