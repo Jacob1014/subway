@@ -213,6 +213,29 @@
   .orbit-dot.winner {
     box-shadow: 0 0 0 3px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.6);
   }
+
+  /* 토스트 (클립보드 복사 피드백) */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 12px 20px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 100;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
   .orbit-dot {
     position: absolute;
     top: 50%;
@@ -273,11 +296,14 @@
 
     <div class="controls">
       <button class="btn-primary" id="btn-action">호선 뽑기</button>
+      <button class="btn-secondary hidden" id="btn-share">공유하기</button>
       <button class="btn-secondary hidden" id="btn-restart">처음부터 다시</button>
     </div>
 
     <div class="footer">수도권 전철 · 데이터는 큐레이션됨</div>
   </div>
+
+  <div class="toast" id="toast">링크 복사됨</div>
 
 <script>
 // ─── 데이터 ──────────────────────────────────────────────────────
@@ -372,6 +398,7 @@ const STATION_QUIPS = [
 const $ = (id) => document.getElementById(id);
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const LINE_BY_ID = Object.fromEntries(LINES.map(l => [l.id, l]));
 
 function setLineTheme(line) {
   document.body.style.setProperty('--line-color', line.color);
@@ -491,6 +518,7 @@ async function rollStation() {
   if (state !== 'line-done') return;
   state = 'station-spinning';
   $('btn-action').disabled = true;
+  $('btn-share').classList.add('hidden'); // 회전 중엔 공유 버튼 숨김
 
   // 이전 단계 배지 보여주면서 슬롯 돌리기
   showStep('step-station-spin');
@@ -501,9 +529,17 @@ async function rollStation() {
 
   await spinSlot($('station-track'), stationNames, chosenStation, 2200);
 
+  await applyFinalState(chosenLine, chosenStation);
+}
+
+// 최종 결과 표시 — rollStation 끝과 딥링크 진입 모두에서 호출
+async function applyFinalState(line, station) {
+  chosenLine = line;
+  chosenStation = station;
+  setLineTheme(line);
   showStep('step-final');
-  renderBadge($('line-badge-3'), chosenLine);
-  $('station-name').textContent = chosenStation;
+  renderBadge($('line-badge-3'), line);
+  $('station-name').textContent = station;
   $('station-meta').textContent = pick(STATION_QUIPS);
   await sleep(50);
   $('station-name').classList.add('show');
@@ -511,9 +547,11 @@ async function rollStation() {
 
   state = 'done';
   $('btn-action').textContent = '한 번 더';
+  $('btn-action').disabled = false;
   $('btn-restart').classList.remove('hidden');
   $('btn-restart').textContent = '다른 호선으로';
-  $('btn-action').disabled = false;
+  $('btn-share').classList.remove('hidden');
+  updateURL(line, station);
 }
 
 function reset() {
@@ -539,6 +577,8 @@ function reset() {
   showStep('step-idle');
   $('btn-action').textContent = '호선 뽑기';
   $('btn-restart').classList.add('hidden');
+  $('btn-share').classList.add('hidden');
+  clearURL();
 }
 
 // ─── 이벤트 ──────────────────────────────────────────────────────
@@ -559,6 +599,66 @@ $('btn-action').addEventListener('click', async () => {
 $('btn-restart').addEventListener('click', () => {
   reset();
 });
+
+$('btn-share').addEventListener('click', handleShare);
+
+// ─── URL / 딥링크 / 공유 ─────────────────────────────────────────
+function updateURL(line, station) {
+  const params = new URLSearchParams();
+  params.set('line', line.id);
+  params.set('station', station);
+  history.replaceState(null, '', '?' + params.toString());
+}
+
+function clearURL() {
+  history.replaceState(null, '', location.pathname);
+}
+
+function tryDeepLink() {
+  const params = new URLSearchParams(location.search);
+  const lineId = params.get('line');
+  const station = params.get('station');
+  if (!lineId || !station) return false;
+  const line = LINE_BY_ID[lineId];
+  if (!line || !line.stations.includes(station)) {
+    clearURL(); // 잘못된 파라미터는 정리
+    return false;
+  }
+  applyFinalState(line, station);
+  return true;
+}
+
+async function handleShare() {
+  if (!chosenLine || !chosenStation) return;
+  const url = location.href;
+  const text = `오늘의 지하철 🎲 — ${chosenLine.name} ${chosenStation}`;
+
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: '오늘의 지하철', text, url });
+      return;
+    } catch (e) {
+      if (e.name === 'AbortError') return; // 사용자가 취소
+      // 다른 에러면 클립보드 폴백으로 진행
+    }
+  }
+
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    showToast('링크 복사됨');
+  } catch {
+    showToast('복사 실패. 주소창을 직접 복사해주세요.');
+  }
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
 
 // ─── 시작 화면 호선 둘레 빌드 ───────────────────────────────────
 function buildOrbit() {
@@ -592,6 +692,7 @@ function buildOrbit() {
   }));
 }
 buildOrbit();
+tryDeepLink();
 </script>
 </body>
 </html>
