@@ -510,7 +510,7 @@ async function rollLine() {
   await sleep(500);
 
   state = 'line-done';
-  $('btn-action').textContent = '이 호선에서 역 뽑기';
+  $('btn-action').textContent = `${chosenLine.name}에서 역 뽑기`;
   $('btn-action').disabled = false;
 }
 
@@ -546,7 +546,7 @@ async function applyFinalState(line, station) {
   $('station-meta').classList.add('show');
 
   state = 'done';
-  $('btn-action').textContent = '한 번 더';
+  $('btn-action').textContent = `${line.name}에서 한 번 더`;
   $('btn-action').disabled = false;
   $('btn-restart').classList.remove('hidden');
   $('btn-restart').textContent = '다른 호선으로';
