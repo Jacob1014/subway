@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>오늘의 지하철 🎲</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --surface: #1a1d24;
+    --text: #f4f4f5;
+    --muted: #9ca3af;
+    --accent: #f4f4f5;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    transition: background 0.6s ease;
+  }
+  body.has-line {
+    background: linear-gradient(180deg, var(--line-color, var(--bg)) 0%, var(--bg) 65%);
+  }
+  .app {
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    letter-spacing: -0.02em;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 36px;
+  }
+  .stage {
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 40px 24px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  }
+  .slot {
+    font-size: 44px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    height: 60px;
+    line-height: 60px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+  }
+  .slot-track {
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.05s linear;
+  }
+  .slot-item {
+    height: 60px;
+    line-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+  }
+  .label {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .line-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 16px;
+    background: var(--line-color, #444);
+    color: var(--line-text, #fff);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.4s ease;
+  }
+  .line-badge.show {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .station {
+    font-size: 56px;
+    font-weight: 900;
+    letter-spacing: -0.04em;
+    margin: 8px 0 0;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .station.show {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .station-meta {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.4s ease 0.2s;
+  }
+  .station-meta.show { opacity: 1; }
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 24px;
+  }
+  button {
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    padding: 16px 24px;
+    cursor: pointer;
+    transition: transform 0.1s ease, opacity 0.2s ease;
+  }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary {
+    background: var(--text);
+    color: var(--bg);
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid #2c3038;
+  }
+  .footer {
+    margin-top: 24px;
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+  .hidden { display: none !important; }
+
+  /* 시작 화면 — 호선 둘레 */
+  .orbit-wrapper {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    margin: 0 auto 12px;
+  }
+  .orbit {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+  }
+  .orbit-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 52px;
+    z-index: 2;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+    pointer-events: none;
+  }
+  .orbit-pointer {
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-top: 11px solid var(--text);
+    z-index: 3;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  }
+  .orbit-dot.winner {
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.4), 0 0 20px rgba(255,255,255,0.6);
+  }
+  .orbit-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+    margin: -15px 0 0 -15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <h1>오늘의 지하철 🎲</h1>
+    <p class="subtitle">호선 뽑고, 역 뽑고. 어디 한번 가볼까.</p>
+
+    <div class="stage">
+      <!-- 1단계: 호선 뽑기 전 / 룰렛 회전 중 -->
+      <div id="step-idle">
+        <div class="orbit-wrapper">
+          <div class="orbit-pointer"></div>
+          <div class="orbit" id="orbit">
+            <!-- 호선 점들은 JS로 생성 -->
+          </div>
+          <div class="orbit-center">🚇</div>
+        </div>
+      </div>
+
+      <!-- 2단계: 호선 결과 -->
+      <div id="step-line-result" class="hidden">
+        <div class="label">오늘의 호선</div>
+        <span class="line-badge" id="line-badge"></span>
+      </div>
+
+      <!-- 3단계: 역 슬롯 -->
+      <div id="step-station-spin" class="hidden">
+        <div class="label">이 호선의 역들 중에서...</div>
+        <span class="line-badge show" id="line-badge-2"></span>
+        <div class="slot">
+          <div class="slot-track" id="station-track"></div>
+        </div>
+      </div>
+
+      <!-- 4단계: 최종 결과 -->
+      <div id="step-final" class="hidden">
+        <span class="line-badge show" id="line-badge-3"></span>
+        <h2 class="station" id="station-name"></h2>
+        <div class="station-meta" id="station-meta"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-primary" id="btn-action">호선 뽑기</button>
+      <button class="btn-secondary hidden" id="btn-restart">처음부터 다시</button>
+    </div>
+
+    <div class="footer">수도권 전철 · 데이터는 큐레이션됨</div>
+  </div>
+
+<script>
+// ─── 데이터 ──────────────────────────────────────────────────────
+// 수도권 전철 호선 + 역. 색상은 공식 노선색 기반.
+const LINES = [
+  {
+    id: "1", name: "1호선", short: "1", color: "#0052A4", textColor: "#fff",
+    stations: ["소요산","동두천","보산","동두천중앙","지행","덕정","덕계","양주","녹양","가능","의정부","회룡","망월사","도봉산","도봉","방학","창동","녹천","월계","광운대","석계","신이문","외대앞","회기","청량리","제기동","신설동","동묘앞","동대문","종로5가","종로3가","종각","시청","서울역","남영","용산","노량진","대방","신길","영등포","신도림","구로","구일","개봉","오류동","온수","역곡","소사","부천","중동","송내","부개","부평","백운","동암","간석","주안","도화","제물포","도원","동인천","인천","가산디지털단지","독산","금천구청","석수","관악","안양","명학","금정","군포","당정","의왕","성균관대","화서","수원","세류","병점","세마","오산대","오산","진위","송탄","서정리","평택지제","평택","성환","직산","두정","천안","봉명","쌍용","아산","배방","온양온천","신창"]
+  },
+  {
+    id: "2", name: "2호선", short: "2", color: "#00A84D", textColor: "#fff",
+    stations: ["시청","을지로입구","을지로3가","을지로4가","동대문역사문화공원","신당","상왕십리","왕십리","한양대","뚝섬","성수","건대입구","구의","강변","잠실나루","잠실","잠실새내","종합운동장","삼성","선릉","역삼","강남","교대","서초","방배","사당","낙성대","서울대입구","봉천","신림","신대방","구로디지털단지","대림","신도림","문래","영등포구청","당산","합정","홍대입구","신촌","이대","아현","충정로","용답","신답","용두","도림천","양천구청","신정네거리","까치산"]
+  },
+  {
+    id: "3", name: "3호선", short: "3", color: "#EF7C1C", textColor: "#fff",
+    stations: ["대화","주엽","정발산","마두","백석","대곡","화정","원당","원흥","삼송","지축","구파발","연신내","불광","녹번","홍제","무악재","독립문","경복궁","안국","종로3가","을지로3가","충무로","동대입구","약수","금호","옥수","압구정","신사","잠원","고속터미널","교대","남부터미널","양재","매봉","도곡","대치","학여울","대청","일원","수서","가락시장","경찰병원","오금"]
+  },
+  {
+    id: "4", name: "4호선", short: "4", color: "#00A5DE", textColor: "#fff",
+    stations: ["당고개","상계","노원","창동","쌍문","수유","미아","미아사거리","길음","성신여대입구","한성대입구","혜화","동대문","동대문역사문화공원","충무로","명동","회현","서울역","숙대입구","삼각지","신용산","이촌","동작","총신대입구(이수)","사당","남태령","선바위","경마공원","대공원","과천","정부과천청사","인덕원","평촌","범계","금정","산본","수리산","대야미","반월","상록수","한대앞","중앙","고잔","초지","안산","신길온천","정왕","오이도"]
+  },
+  {
+    id: "5", name: "5호선", short: "5", color: "#996CAC", textColor: "#fff",
+    stations: ["방화","개화산","김포공항","송정","마곡","발산","우장산","화곡","까치산","신정","목동","오목교","양평","영등포구청","영등포시장","신길","여의도","여의나루","마포","공덕","애오개","충정로","서대문","광화문","종로3가","을지로4가","동대문역사문화공원","청구","신금호","행당","왕십리","마장","답십리","장한평","군자","아차산","광나루","천호","강동","둔촌동","올림픽공원","방이","오금","개롱","거여","마천","길동","굽은다리","명일","고덕","상일동","강일","미사","하남풍산","하남시청","하남검단산"]
+  },
+  {
+    id: "6", name: "6호선", short: "6", color: "#CD7C2F", textColor: "#fff",
+    stations: ["응암","역촌","불광","독바위","연신내","구산","새절","증산","디지털미디어시티","월드컵경기장","마포구청","망원","합정","상수","광흥창","대흥","공덕","효창공원앞","삼각지","녹사평","이태원","한강진","버티고개","약수","청구","신당","동묘앞","창신","보문","안암","고려대","월곡","상월곡","돌곶이","석계","태릉입구","화랑대","봉화산","신내"]
+  },
+  {
+    id: "7", name: "7호선", short: "7", color: "#747F00", textColor: "#fff",
+    stations: ["장암","도봉산","수락산","마들","노원","중계","하계","공릉","태릉입구","먹골","중화","상봉","면목","사가정","용마산","중곡","군자","어린이대공원","건대입구","뚝섬유원지","청담","강남구청","학동","논현","반포","고속터미널","내방","이수","남성","숭실대입구","상도","장승배기","신대방삼거리","보라매","신풍","대림","남구로","가산디지털단지","철산","광명사거리","천왕","온수","까치울","부천종합운동장","춘의","신중동","부천시청","상동","삼산체육관","굴포천","부평구청","산곡","석남"]
+  },
+  {
+    id: "8", name: "8호선", short: "8", color: "#E6186C", textColor: "#fff",
+    stations: ["별내","다산","동구릉","구리","장자호수공원","암사역사공원","암사","천호","강동구청","몽촌토성","잠실","석촌","송파","가락시장","문정","장지","복정","산성","남한산성입구","단대오거리","신흥","수진","모란"]
+  },
+  {
+    id: "9", name: "9호선", short: "9", color: "#BDB092", textColor: "#3a2e00",
+    stations: ["개화","김포공항","공항시장","신방화","마곡나루","양천향교","가양","증미","등촌","염창","신목동","선유도","당산","국회의사당","여의도","샛강","노량진","노들","흑석","동작","구반포","신반포","고속터미널","사평","신논현","언주","선정릉","삼성중앙","봉은사","종합운동장","삼전","석촌고분","석촌","송파나루","한성백제","올림픽공원","둔촌오륜","중앙보훈병원"]
+  },
+  {
+    id: "suin-bundang", name: "수인분당선", short: "수분", color: "#FABE00", textColor: "#3a2e00",
+    stations: ["청량리","왕십리","서울숲","압구정로데오","강남구청","선정릉","선릉","한티","도곡","구룡","개포동","대모산입구","수서","복정","가천대","태평","모란","야탑","이매","서현","수내","정자","미금","오리","죽전","보정","구성","신갈","기흥","상갈","청명","영통","망포","매탄권선","수원시청","매교","수원","고색","오목천","어천","야목","사리","한대앞","중앙","고잔","초지","안산","신길온천","정왕","오이도","달월","월곶","소래포구","인천논현","호구포","남동인더스파크","원인재","연수","송도","인하대","숭의","신포","인천"]
+  },
+  {
+    id: "gyeongui-jungang", name: "경의·중앙선", short: "경의", color: "#77C4A3", textColor: "#fff",
+    stations: ["문산","파주","월롱","금촌","금릉","운정","야당","탄현","일산","풍산","백마","곡산","대곡","능곡","행신","강매","화전","수색","디지털미디어시티","가좌","홍대입구","서강대","공덕","효창공원앞","용산","이촌","서빙고","한남","옥수","응봉","왕십리","청량리","회기","중랑","상봉","망우","양원","구리","도농","양정","덕소","도심","팔당","운길산","양수","신원","국수","아신","오빈","양평","원덕","용문","지평"]
+  },
+  {
+    id: "airport", name: "공항철도", short: "공항", color: "#0090D2", textColor: "#fff",
+    stations: ["서울역","공덕","홍대입구","디지털미디어시티","마곡나루","김포공항","계양","검암","청라국제도시","영종","운서","공항화물청사","인천공항1터미널","인천공항2터미널"]
+  },
+  {
+    id: "gyeongchun", name: "경춘선", short: "경춘", color: "#178C72", textColor: "#fff",
+    stations: ["청량리","광운대","상봉","망우","신내","갈매","별내","퇴계원","사릉","금곡","평내호평","천마산","마석","대성리","청평","상천","가평","굴봉산","백양리","강촌","김유정","남춘천","춘천"]
+  },
+  {
+    id: "shinbundang", name: "신분당선", short: "신분", color: "#D4003B", textColor: "#fff",
+    stations: ["신사","논현","신논현","강남","양재","양재시민의숲","청계산입구","판교","정자","미금","동천","수지구청","성복","상현","광교중앙","광교"]
+  },
+  {
+    id: "incheon1", name: "인천1호선", short: "인1", color: "#7CA8D5", textColor: "#fff",
+    stations: ["계양","귤현","박촌","임학","계산","경인교대입구","작전","갈산","부평구청","부평시장","부평","동수","부평삼거리","간석오거리","인천시청","예술회관","인천터미널","문학경기장","선학","신연수","원인재","동춘","동막","캠퍼스타운","테크노파크","지식정보단지","인천대입구","센트럴파크","국제업무지구","송도달빛축제공원"]
+  },
+  {
+    id: "incheon2", name: "인천2호선", short: "인2", color: "#ED8B00", textColor: "#fff",
+    stations: ["검단오류","왕길","검단사거리","마전","완정","독정","검바위","아시아드경기장","서구청","가정","가정중앙시장","석남","서부여성회관","인천가좌","가재울","주안국가산단","주안","시민공원","석바위시장","인천시청","석천사거리","모래내시장","만수","남동구청","인천대공원","운연"]
+  },
+  {
+    id: "ui-shinseol", name: "우이신설선", short: "우이", color: "#B7C452", textColor: "#3a2e00",
+    stations: ["북한산우이","솔밭공원","4.19민주묘지","가오리","화계","삼양","삼양사거리","솔샘","북한산보국문","정릉","성신여대입구","보문","신설동"]
+  },
+  {
+    id: "shillim", name: "신림선", short: "신림", color: "#6789CA", textColor: "#fff",
+    stations: ["샛강","대방","서울지방병무청","보라매","보라매공원","보라매병원","당곡","신림","서원","서울대벤처타운","관악산"]
+  },
+  {
+    id: "gimpo-gold", name: "김포골드라인", short: "김포", color: "#A17800", textColor: "#fff",
+    stations: ["양촌","구래","마산","장기","운양","걸포북변","사우","풍무","고촌","김포공항"]
+  }
+];
+
+// 호선 안내 멘트 (재미 요소)
+const STATION_QUIPS = [
+  "오늘은 여기로!","뭐가 있는지 가서 확인해봐.","의외의 발견이 있을지도?",
+  "가본 적 있어?","걸어다니기 좋은 동네야.","맛집 검색 ㄱㄱ",
+  "사진 찍기 좋은 곳일지도.","산책하기 딱 좋네.","지도부터 켜자."
+];
+
+// ─── 유틸 ──────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function setLineTheme(line) {
+  document.body.style.setProperty('--line-color', line.color);
+  document.body.style.setProperty('--line-text', line.textColor);
+  document.body.classList.add('has-line');
+}
+function clearLineTheme() {
+  document.body.classList.remove('has-line');
+  document.body.style.removeProperty('--line-color');
+  document.body.style.removeProperty('--line-text');
+}
+function renderBadge(el, line) {
+  el.textContent = line.name;
+  el.style.background = line.color;
+  el.style.color = line.textColor;
+}
+
+// 슬롯머신 애니메이션
+async function spinSlot(trackEl, items, finalItem, durationMs = 1800) {
+  const itemHeight = 60;
+  const reel = [];
+  const minLoops = 12;
+  for (let i = 0; i < minLoops; i++) {
+    for (const it of items) reel.push(it);
+  }
+  reel.push(finalItem);
+
+  // 1) 하드 리셋: transition 끄고 transform 0으로 즉시 스냅
+  trackEl.style.transition = 'none';
+  trackEl.style.transform = 'translateY(0px)';
+  trackEl.innerHTML = reel.map(t => `<div class="slot-item">${t}</div>`).join('');
+
+  // 2) 두 프레임 기다려서 리셋이 확실히 커밋되게 함
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // 3) 타겟 위치로 애니메이트
+  const targetY = -(reel.length - 1) * itemHeight;
+  trackEl.style.transition = `transform ${durationMs}ms cubic-bezier(0.15, 0.65, 0.25, 1)`;
+  trackEl.style.transform = `translateY(${targetY}px)`;
+
+  await sleep(durationMs + 50);
+}
+
+// ─── 룰렛 회전 ──────────────────────────────────────────────────
+let orbitRotation = 0;
+
+async function spinOrbit(targetIdx) {
+  const orbit = $('orbit');
+  const total = LINES.length;
+  // 12시 방향에 targetIdx가 오게 하려면 -i/total*360 만큼 회전
+  const targetMod = (((-(targetIdx / total) * 360) % 360) + 360) % 360;
+  const minRotation = orbitRotation + 5 * 360; // 최소 5바퀴
+  const minMod = ((minRotation % 360) + 360) % 360;
+  let delta = targetMod - minMod;
+  if (delta < 0) delta += 360;
+  const newRotation = minRotation + delta;
+
+  const duration = 2800;
+  const easing = 'cubic-bezier(0.15, 0.7, 0.25, 1)';
+
+  orbit.style.transition = `transform ${duration}ms ${easing}`;
+  orbit.style.transform = `rotate(${newRotation}deg)`;
+
+  // 각 점은 카운터 회전해서 글자가 똑바로 유지되게
+  orbit.querySelectorAll('.orbit-dot').forEach(dot => {
+    dot.style.transition = `transform ${duration}ms ${easing}`;
+    dot.style.transform = `translate(${dot.dataset.x}px, ${dot.dataset.y}px) rotate(${-newRotation}deg)`;
+  });
+
+  orbitRotation = newRotation;
+  await sleep(duration + 80);
+}
+
+function highlightWinner(targetIdx) {
+  const dots = $('orbit').querySelectorAll('.orbit-dot');
+  dots.forEach(d => d.classList.remove('winner'));
+  if (dots[targetIdx]) dots[targetIdx].classList.add('winner');
+}
+
+// ─── 상태 머신 ──────────────────────────────────────────────────
+let state = 'idle'; // idle | line-spinning | line-done | station-spinning | done
+let chosenLine = null;
+let chosenStation = null;
+
+function showStep(id) {
+  ['step-idle','step-line-result','step-station-spin','step-final']
+    .forEach(s => $(s).classList.toggle('hidden', s !== id));
+}
+
+async function rollLine() {
+  if (state !== 'idle') return;
+  state = 'line-spinning';
+  $('btn-action').disabled = true;
+
+  const targetIdx = Math.floor(Math.random() * LINES.length);
+  chosenLine = LINES[targetIdx];
+
+  await spinOrbit(targetIdx);
+  highlightWinner(targetIdx);
+
+  await sleep(500);
+
+  setLineTheme(chosenLine);
+  showStep('step-line-result');
+  const badge = $('line-badge');
+  renderBadge(badge, chosenLine);
+  badge.classList.add('show');
+
+  await sleep(500);
+
+  state = 'line-done';
+  $('btn-action').textContent = '이 호선에서 역 뽑기';
+  $('btn-action').disabled = false;
+}
+
+async function rollStation() {
+  if (state !== 'line-done') return;
+  state = 'station-spinning';
+  $('btn-action').disabled = true;
+
+  // 이전 단계 배지 보여주면서 슬롯 돌리기
+  showStep('step-station-spin');
+  renderBadge($('line-badge-2'), chosenLine);
+
+  const stationNames = chosenLine.stations;
+  chosenStation = pick(stationNames);
+
+  await spinSlot($('station-track'), stationNames, chosenStation, 2200);
+
+  showStep('step-final');
+  renderBadge($('line-badge-3'), chosenLine);
+  $('station-name').textContent = chosenStation;
+  $('station-meta').textContent = pick(STATION_QUIPS);
+  await sleep(50);
+  $('station-name').classList.add('show');
+  $('station-meta').classList.add('show');
+
+  state = 'done';
+  $('btn-action').textContent = '한 번 더';
+  $('btn-restart').classList.remove('hidden');
+  $('btn-restart').textContent = '다른 호선으로';
+  $('btn-action').disabled = false;
+}
+
+function reset() {
+  state = 'idle';
+  chosenLine = null;
+  chosenStation = null;
+  clearLineTheme();
+  $('line-badge').classList.remove('show');
+  $('station-name').classList.remove('show');
+  $('station-meta').classList.remove('show');
+
+  // 룰렛 회전 초기화 (transition 끄고 즉시 스냅)
+  const orbit = $('orbit');
+  orbit.style.transition = 'none';
+  orbit.style.transform = 'rotate(0deg)';
+  orbit.querySelectorAll('.orbit-dot').forEach(dot => {
+    dot.classList.remove('winner');
+    dot.style.transition = 'none';
+    dot.style.transform = `translate(${dot.dataset.x}px, ${dot.dataset.y}px)`;
+  });
+  orbitRotation = 0;
+
+  showStep('step-idle');
+  $('btn-action').textContent = '호선 뽑기';
+  $('btn-restart').classList.add('hidden');
+}
+
+// ─── 이벤트 ──────────────────────────────────────────────────────
+$('btn-action').addEventListener('click', async () => {
+  if (state === 'idle') {
+    await rollLine();
+  } else if (state === 'line-done') {
+    await rollStation();
+  } else if (state === 'done') {
+    // 한 번 더 — 같은 호선에서 다른 역
+    state = 'line-done';
+    $('station-name').classList.remove('show');
+    $('station-meta').classList.remove('show');
+    await rollStation();
+  }
+});
+
+$('btn-restart').addEventListener('click', () => {
+  reset();
+});
+
+// ─── 시작 화면 호선 둘레 빌드 ───────────────────────────────────
+function buildOrbit() {
+  const orbit = $('orbit');
+  const radius = 100;
+  const total = LINES.length;
+  LINES.forEach((line, i) => {
+    // 12시 방향에서 시작해서 시계방향
+    const angle = (i / total) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    const dot = document.createElement('div');
+    dot.className = 'orbit-dot';
+    dot.style.background = line.color;
+    dot.style.color = line.textColor;
+    dot.dataset.x = x;
+    dot.dataset.y = y;
+    // 초기 상태: 가운데에서 작게, 투명
+    dot.style.transform = `translate(${x}px, ${y}px) scale(0.3)`;
+    dot.style.transition = `transform 0.5s ease ${i * 30}ms, opacity 0.5s ease ${i * 30}ms`;
+    dot.textContent = line.short;
+    dot.title = line.name;
+    orbit.appendChild(dot);
+  });
+  // 두 프레임 후 팝업
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    orbit.querySelectorAll('.orbit-dot').forEach(dot => {
+      dot.style.transform = `translate(${dot.dataset.x}px, ${dot.dataset.y}px)`;
+      dot.style.opacity = '1';
+    });
+  }));
+}
+buildOrbit();
+</script>
+</body>
+</html>
