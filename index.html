@@ -82,7 +82,7 @@
   .slot-track {
     display: flex;
     flex-direction: column;
-    transition: transform 0.05s linear;
+    will-change: transform;
   }
   .slot-item {
     height: 60px;
@@ -419,16 +419,18 @@ function renderBadge(el, line) {
 // 슬롯머신 애니메이션
 async function spinSlot(trackEl, items, finalItem, durationMs = 1800) {
   const itemHeight = 60;
+  // 적당한 길이의 reel — 너무 길면 모바일에서 버벅임 (1호선 94역 × 12 loop = 1128 DOM)
+  // 35개로 랜덤 샘플링. 마지막은 finalItem.
+  const reelLen = 35;
   const reel = [];
-  const minLoops = 12;
-  for (let i = 0; i < minLoops; i++) {
-    for (const it of items) reel.push(it);
+  for (let i = 0; i < reelLen - 1; i++) {
+    reel.push(items[Math.floor(Math.random() * items.length)]);
   }
   reel.push(finalItem);
 
-  // 1) 하드 리셋: transition 끄고 transform 0으로 즉시 스냅
+  // 1) 하드 리셋: transition 끄고 transform 0으로 즉시 스냅 (translate3d로 GPU 컴포지팅)
   trackEl.style.transition = 'none';
-  trackEl.style.transform = 'translateY(0px)';
+  trackEl.style.transform = 'translate3d(0, 0, 0)';
   trackEl.innerHTML = reel.map(t => `<div class="slot-item">${t}</div>`).join('');
 
   // 2) 두 프레임 기다려서 리셋이 확실히 커밋되게 함
@@ -437,7 +439,7 @@ async function spinSlot(trackEl, items, finalItem, durationMs = 1800) {
   // 3) 타겟 위치로 애니메이트
   const targetY = -(reel.length - 1) * itemHeight;
   trackEl.style.transition = `transform ${durationMs}ms cubic-bezier(0.15, 0.65, 0.25, 1)`;
-  trackEl.style.transform = `translateY(${targetY}px)`;
+  trackEl.style.transform = `translate3d(0, ${targetY}px, 0)`;
 
   await sleep(durationMs + 50);
 }
