@@ -420,8 +420,8 @@ function renderBadge(el, line) {
 async function spinSlot(trackEl, items, finalItem, durationMs = 1800) {
   const itemHeight = 60;
   // 적당한 길이의 reel — 너무 길면 모바일에서 버벅임 (1호선 94역 × 12 loop = 1128 DOM)
-  // 35개로 랜덤 샘플링. 마지막은 finalItem.
-  const reelLen = 35;
+  // 60개로 랜덤 샘플링하면 ~3600px scroll. 마지막은 finalItem.
+  const reelLen = 60;
   const reel = [];
   for (let i = 0; i < reelLen - 1; i++) {
     reel.push(items[Math.floor(Math.random() * items.length)]);
@@ -529,7 +529,7 @@ async function rollStation() {
   const stationNames = chosenLine.stations;
   chosenStation = pick(stationNames);
 
-  await spinSlot($('station-track'), stationNames, chosenStation, 2200);
+  await spinSlot($('station-track'), stationNames, chosenStation, 3000);
 
   await applyFinalState(chosenLine, chosenStation);
 }
