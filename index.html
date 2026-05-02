@@ -61,6 +61,14 @@
     gap: 16px;
     box-shadow: 0 10px 40px rgba(0,0,0,0.3);
   }
+  /* 각 step 컨테이너도 flex column + gap으로 자식 간 간격 */
+  .stage > div:not(.hidden) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+  }
   .slot {
     font-size: 44px;
     font-weight: 800;
@@ -109,10 +117,13 @@
     transform: translateY(0);
   }
   .station {
-    font-size: 56px;
+    font-size: 52px;
     font-weight: 900;
     letter-spacing: -0.04em;
-    margin: 8px 0 0;
+    line-height: 1.05;
+    margin: 0;
+    text-align: center;
+    word-break: keep-all;
     opacity: 0;
     transform: scale(0.9);
     transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -124,7 +135,7 @@
   .station-meta {
     font-size: 13px;
     color: var(--muted);
-    margin-top: 4px;
+    margin: 0;
     opacity: 0;
     transition: opacity 0.4s ease 0.2s;
   }
@@ -352,9 +363,9 @@ const LINES = [
 
 // 호선 안내 멘트 (재미 요소)
 const STATION_QUIPS = [
-  "오늘은 여기로!","뭐가 있는지 가서 확인해봐.","의외의 발견이 있을지도?",
-  "가본 적 있어?","걸어다니기 좋은 동네야.","맛집 검색 ㄱㄱ",
-  "사진 찍기 좋은 곳일지도.","산책하기 딱 좋네.","지도부터 켜자."
+  "오늘은 여기로!","의외의 발견이 있을지도?",
+  "가본 적 있어?", "맛집 검색 ㄱㄱ",
+  "사진 찍기 좋은 곳일지도"
 ];
 
 // ─── 유틸 ──────────────────────────────────────────────────────
